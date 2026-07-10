@@ -45,41 +45,40 @@
       })({ key: "AIzaSyAdRG1GxrdRTXK39zysIT57solJYXuqDm8", v: "weekly" });
     </script>
   </head>
-  <body>
-    <div>
-      <label for="daySelect" class="col-sm-2 mb-1 col-form-label">Panchayat</label>
-      <div class="col-sm-10">
-        <div class="row">
-          <div class="col-sm-3">
+  <body style="margin: 0; min-height: 100vh; display: flex; flex-direction: column; font-family: sans-serif">
+    <div style="display: flex; justify-content: center; padding: 24px 16px 0">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; width: min(1100px, 100%)">
+        <label for="daySelect" class="col-sm-2 mb-1 col-form-label">Sarvarakshana Map Standalone App</label>
+        <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; width: 100%">
+          <div style="flex: 1 1 220px; max-width: 250px">
             <select id="daySelect" class="form-control">
               <option value="">Select Panchayat</option>
             </select>
           </div>
-          <div class="col-sm-3">
+          <div style="flex: 1 1 220px; max-width: 250px">
             <select id="batchSelect" class="form-control" disabled>
               <option value="">Select Village</option>
             </select>
           </div>
-          <div class="col-sm-3">
+          <div style="flex: 1 1 220px; max-width: 250px">
             <select id="fieldWorker" class="form-control" disabled>
               <option value="">Select Field Worker</option>
             </select>
           </div>
-          <div class="col-sm-3">
+          <div style="flex: 1 1 220px; max-width: 250px">
             <button id="submitSelection" type="button" class="form-control" disabled>Submit</button>
           </div>
         </div>
       </div>
     </div>
-    <div class="col-lg-6" id="surveysectionMap">
+    <div class="col-lg-6" id="surveysectionMap" style="flex: 1; width: min(1100px, 100%); margin: 0 auto; padding: 20px 16px 0; box-sizing: border-box">
       <div class="card h-100">
         <div class="row" style="margin-top: 20px">
-          <h6 class="section-title" style="align-content: center">Location Summary</h6>
           <div id="map" style="height: 600px; padding: 20px"></div>
           <div id="nodata" style="text-align: center; margin: auto; padding: 10px" hidden="true"></div>
         </div>
       </div>
     </div>
-    <footer style="justify-content: flex-end">Version 0.1.0</footer>
+    <footer style="display: flex; justify-content: flex-end; padding: 16px; margin-top: auto">Version 0.1.0</footer>
   </body>
 </html>
