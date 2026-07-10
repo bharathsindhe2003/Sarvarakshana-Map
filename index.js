@@ -1,11 +1,12 @@
 const firebaseConfig = {
-  apiKey: "AIzaSyCGISwf0hk9UbvKVxeGyb5YH3d90CugWH0",
-  authDomain: "demoapp-220e0.firebaseapp.com",
-  databaseURL: "https://demoapp-220e0-default-rtdb.firebaseio.com",
-  projectId: "demoapp-220e0",
-  storageBucket: "demoapp-220e0.firebasestorage.app",
-  messagingSenderId: "951299710394",
-  appId: "1:951299710394:web:ef61759ece6e8cd9ab5183",
+  apiKey: "AIzaSyDxwWanrz_T-FQICF89Vl6HGKS7TBixrek",
+  authDomain: "sarvarakshana-development.firebaseapp.com",
+  databaseURL: "https://sarvarakshana-development-default-rtdb.firebaseio.com",
+  projectId: "sarvarakshana-development",
+  storageBucket: "sarvarakshana-development.appspot.com",
+  messagingSenderId: "345813046788",
+  appId: "1:345813046788:web:a43b5531f81f21c8e90751",
+  measurementId: "G-D9PJ9QT6C7",
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -13,23 +14,43 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let map;
-let polyline = null;
-let startMarker = null;
-let endMarker = null;
+let polylines = [];
+let startMarkers = [];
+let endMarkers = [];
 let infoWindow = null;
+
+const mapColors = ["#d62828", "#1d4ed8", "#2a9d8f", "#f4a261", "#6d28d9", "#111827"];
 
 function formatTimestamp(timestamp, uuid) {
   const date = new Date(timestamp * 1000);
+  const dayLabel = date.toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   return `
       <div>
         <b>Field Worker</b><br>
         ${uuid}<br><br>
+        <b>Day</b><br>
+        ${dayLabel}<br><br>
         <b>Date & Time</b><br>
         ${date.toLocaleString()}<br>
         ${timestamp}
       </div>
     `;
+}
+
+function formatTimestampOption(timestamp) {
+  const parsedTimestamp = Number.parseInt(timestamp, 10);
+
+  if (!Number.isFinite(parsedTimestamp)) {
+    return timestamp;
+  }
+
+  return `${new Date(parsedTimestamp * 1000).toLocaleString()} (${timestamp})`;
 }
 
 function setNoDataMessage(message) {
@@ -67,7 +88,110 @@ function parseLocationPoint(rawValue, timestamp, uuid) {
     lng,
     timestamp: parsedTimestamp,
     uuid,
+    dayKey: new Date(parsedTimestamp * 1000).toISOString().slice(0, 10),
   };
+}
+
+function populateSelect(select, options, placeholder, formatter = (value) => value) {
+  select.innerHTML = "";
+
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = placeholder;
+  select.appendChild(placeholderOption);
+
+  options.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = formatter(value);
+    select.appendChild(option);
+  });
+
+  select.disabled = options.length === 0;
+}
+
+function populateTimestampSelect(select, timestamps) {
+  select.innerHTML = "";
+
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = "Select Timestamp";
+  select.appendChild(placeholderOption);
+
+  const allOption = document.createElement("option");
+  allOption.value = "__all__";
+  allOption.textContent = "All Timestamps";
+  select.appendChild(allOption);
+
+  timestamps.forEach((timestamp) => {
+    const option = document.createElement("option");
+    option.value = timestamp;
+    option.textContent = formatTimestampOption(timestamp);
+    select.appendChild(option);
+  });
+
+  select.disabled = timestamps.length === 0;
+}
+
+function updateSubmitButtonState() {
+  const daySelect = document.getElementById("daySelect");
+  const batchSelect = document.getElementById("batchSelect");
+  const fieldWorkerSelect = document.getElementById("fieldWorker");
+  const submitButton = document.getElementById("submitSelection");
+
+  if (!submitButton) {
+    return;
+  }
+
+  submitButton.disabled = !(daySelect.value && batchSelect.value && fieldWorkerSelect.value);
+}
+
+function clearMapOverlays() {
+  polylines.forEach((line) => line.setMap(null));
+  polylines = [];
+
+  startMarkers.forEach((marker) => marker.setMap(null));
+  endMarkers.forEach((marker) => marker.setMap(null));
+  startMarkers = [];
+  endMarkers = [];
+}
+
+async function loadNestedKeys(path) {
+  const response = await fetch(`${firebaseConfig.databaseURL}/${path}.json?shallow=true`);
+  const data = (await response.json()) || {};
+
+  return Object.keys(data).sort();
+}
+
+function groupPointsByDay(path) {
+  return path.reduce((groups, point) => {
+    if (!groups[point.dayKey]) {
+      groups[point.dayKey] = [];
+    }
+
+    groups[point.dayKey].push(point);
+    return groups;
+  }, {});
+}
+
+function buildTimestampTracks(workerData, uuid, selectedTimestamp) {
+  const timestamps = Object.keys(workerData || {}).sort();
+  const selectedKeys = selectedTimestamp && selectedTimestamp !== "__all__" ? [selectedTimestamp] : timestamps;
+
+  return selectedKeys
+    .filter((timestampKey) => workerData[timestampKey] && typeof workerData[timestampKey] === "object")
+    .map((timestampKey) => {
+      const path = Object.entries(workerData[timestampKey])
+        .map(([timestamp, rawValue]) => parseLocationPoint(rawValue, timestamp, uuid))
+        .filter(Boolean)
+        .sort((left, right) => left.timestamp - right.timestamp);
+
+      return {
+        timestampKey,
+        path,
+      };
+    })
+    .filter((track) => track.path.length > 0);
 }
 
 function squaredDistanceToSegment(point, start, end) {
@@ -121,43 +245,110 @@ function findPreviousPointForHover(path, hoveredLatLng) {
   return closestSegmentStart;
 }
 
+function createTrackMarker(point, label, strokeColor, title) {
+  return new google.maps.Marker({
+    position: {
+      lat: point.lat,
+      lng: point.lng,
+    },
+    map,
+    label: {
+      text: label,
+      color: "#ffffff",
+      fontWeight: "700",
+    },
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 10,
+      fillColor: strokeColor,
+      fillOpacity: 1,
+      strokeColor: "#ffffff",
+      strokeWeight: 2,
+    },
+    title,
+  });
+}
+
 async function loadFieldWorkers() {
-  const response = await fetch(`${firebaseConfig.databaseURL}/locations.json?shallow=true`);
+  const daySelect = document.getElementById("daySelect");
+  const batchSelect = document.getElementById("batchSelect");
+  const fieldWorkerSelect = document.getElementById("fieldWorker");
+  const submitButton = document.getElementById("submitSelection");
 
-  const locations = (await response.json()) || {};
-  // const locations = snapshot.val() || {};
+  const resetFieldWorkers = () => {
+    populateSelect(fieldWorkerSelect, [], "Select Field Worker");
+  };
 
-  const select = document.getElementById("fieldWorker");
+  const resetVillages = () => {
+    populateSelect(batchSelect, [], "Select Village");
+    resetFieldWorkers();
+  };
 
-  select.innerHTML = '<option value="" disabled>Select Field Worker</option>';
+  const updateWorkers = async (dayKey) => {
+    resetFieldWorkers();
+    updateSubmitButtonState();
 
-  Object.keys(locations).forEach((key) => {
-    const option = document.createElement("option");
-    option.value = key;
-    option.textContent = key;
-    select.appendChild(option);
+    if (!dayKey || !batchSelect.value) {
+      return;
+    }
+
+    const workers = await loadNestedKeys(`fw_psy_loctr/${dayKey}/${batchSelect.value}`);
+    populateSelect(fieldWorkerSelect, workers, "Select Field Worker");
+
+    updateSubmitButtonState();
+  };
+
+  const updateBatches = async (dayKey) => {
+    resetVillages();
+    updateSubmitButtonState();
+
+    if (!dayKey) {
+      return;
+    }
+
+    const batches = await loadNestedKeys(`fw_psy_loctr/${dayKey}`);
+    populateSelect(batchSelect, batches, "Select Village");
+
+    updateSubmitButtonState();
+  };
+
+  const days = await loadNestedKeys("fw_psy_loctr");
+
+  populateSelect(daySelect, days, "Select Panchayat");
+  resetVillages();
+
+  updateSubmitButtonState();
+
+  daySelect.addEventListener("change", async (event) => {
+    const dayKey = event.target.value;
+
+    clearMapOverlays();
+    setNoDataMessage("");
+    await updateBatches(dayKey);
+    updateSubmitButtonState();
   });
 
-  // Default selection: FW_02
-  if (locations["FW_02"]) {
-    select.value = "FW_02";
-    await drawPath("FW_02");
-  } else {
-    const keys = Object.keys(locations);
-    if (keys.length) {
-      select.value = keys[0];
-      await drawPath(keys[0]);
-    }
-  }
+  batchSelect.addEventListener("change", async (event) => {
+    clearMapOverlays();
+    setNoDataMessage("");
+    await updateWorkers(daySelect.value);
+    updateSubmitButtonState();
+  });
 
-  select.addEventListener("change", async (e) => {
-    if (e.target.value) {
-      await drawPath(e.target.value);
+  fieldWorkerSelect.addEventListener("change", async (event) => {
+    clearMapOverlays();
+    setNoDataMessage("");
+    updateSubmitButtonState();
+  });
+
+  submitButton.addEventListener("click", async () => {
+    if (daySelect.value && batchSelect.value && fieldWorkerSelect.value) {
+      await drawPath(daySelect.value, batchSelect.value, fieldWorkerSelect.value, "__all__");
     }
   });
 }
 
-async function drawPath(uuid) {
+async function drawPath(dayKey, batchKey, uuid, selectedTimestamp = "__all__") {
   setNoDataMessage("");
 
   if (!map) {
@@ -173,27 +364,15 @@ async function drawPath(uuid) {
     });
   }
 
-  // Remove previous polyline and markers
-  if (polyline) polyline.setMap(null);
-  if (startMarker) startMarker.setMap(null);
-  if (endMarker) endMarker.setMap(null);
+  clearMapOverlays();
 
-  const snapshot = await db.ref(`locations/${uuid}`).orderByKey().once("value");
+  const snapshot = await db.ref(`fw_psy_loctr/${dayKey}/${batchKey}/${uuid}`).once("value");
+  const workerData = snapshot.val() || {};
+  const timestampTracks = buildTimestampTracks(workerData, uuid, selectedTimestamp);
+  const path = timestampTracks.flatMap((track) => track.path).sort((left, right) => left.timestamp - right.timestamp);
 
-  const path = [];
-
-  snapshot.forEach((child) => {
-    const point = parseLocationPoint(child.val(), child.key, uuid);
-
-    if (point) {
-      path.push(point);
-    }
-  });
-
-  path.sort((left, right) => left.timestamp - right.timestamp);
-
-  if (!path.length) {
-    setNoDataMessage(`No GPS points found for ${uuid}.`);
+  if (!timestampTracks.length || !path.length) {
+    setNoDataMessage(`No GPS points found for ${uuid} in ${batchKey}.`);
     map.setCenter({
       lat: 12.972442,
       lng: 77.580643,
@@ -202,38 +381,47 @@ async function drawPath(uuid) {
     return;
   }
 
-  polyline = new google.maps.Polyline({
-    path: path.map((p) => ({
-      lat: p.lat,
-      lng: p.lng,
-    })),
-    geodesic: true,
-    strokeColor: "#FF0000",
-    strokeOpacity: 1,
-    strokeWeight: 5,
-  });
-
-  polyline.setMap(map);
   if (!infoWindow) {
     infoWindow = new google.maps.InfoWindow();
   }
 
-  polyline.addListener("mousemove", (event) => {
-    const previousPoint = findPreviousPointForHover(path, event.latLng);
-
-    if (!previousPoint) {
-      return;
-    }
-
-    infoWindow.setContent(formatTimestamp(previousPoint.timestamp, previousPoint.uuid));
-    infoWindow.setPosition(event.latLng);
-    infoWindow.open({
-      map,
+  timestampTracks.forEach(({ timestampKey, path: currentPath }, index) => {
+    const strokeColor = mapColors[index % mapColors.length];
+    const polyline = new google.maps.Polyline({
+      path: currentPath.map((point) => ({
+        lat: point.lat,
+        lng: point.lng,
+      })),
+      geodesic: true,
+      strokeColor,
+      strokeOpacity: 1,
+      strokeWeight: 5,
     });
-  });
 
-  polyline.addListener("mouseout", () => {
-    infoWindow.close();
+    polyline.setMap(map);
+
+    polyline.addListener("mousemove", (event) => {
+      const previousPoint = findPreviousPointForHover(currentPath, event.latLng);
+
+      if (!previousPoint) {
+        return;
+      }
+
+      infoWindow.setContent(`${formatTimestamp(previousPoint.timestamp, previousPoint.uuid)}<br><b>Timestamp Group</b><br>${formatTimestampOption(timestampKey)}`);
+      infoWindow.setPosition(event.latLng);
+      infoWindow.open({
+        map,
+      });
+    });
+
+    polyline.addListener("mouseout", () => {
+      infoWindow.close();
+    });
+
+    polylines.push(polyline);
+
+    startMarkers.push(createTrackMarker(currentPath[0], "S", strokeColor, `Start: ${formatTimestampOption(timestampKey)}`));
+    endMarkers.push(createTrackMarker(currentPath[currentPath.length - 1], "E", strokeColor, `End: ${formatTimestampOption(timestampKey)}`));
   });
 
   const bounds = new google.maps.LatLngBounds();
@@ -241,26 +429,6 @@ async function drawPath(uuid) {
   path.forEach((point) => bounds.extend(point));
 
   map.fitBounds(bounds);
-
-  startMarker = new google.maps.Marker({
-    position: {
-      lat: path[0].lat,
-      lng: path[0].lng,
-    },
-    map,
-    label: "S",
-    title: "Start",
-  });
-
-  endMarker = new google.maps.Marker({
-    position: {
-      lat: path[path.length - 1].lat,
-      lng: path[path.length - 1].lng,
-    },
-    map,
-    label: "E",
-    title: "End",
-  });
 }
 
 loadFieldWorkers();

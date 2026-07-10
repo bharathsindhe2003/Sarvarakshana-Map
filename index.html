@@ -47,13 +47,26 @@
   </head>
   <body>
     <div>
-      <label for="fieldWorker" class="col-sm-2 mb-1 col-form-label">Field Worker</label>
+      <label for="daySelect" class="col-sm-2 mb-1 col-form-label">Panchayat</label>
       <div class="col-sm-10">
         <div class="row">
-          <div class="col-sm-6">
-            <select id="fieldWorker" class="form-control">
-              <option value=""></option>
+          <div class="col-sm-3">
+            <select id="daySelect" class="form-control">
+              <option value="">Select Panchayat</option>
             </select>
+          </div>
+          <div class="col-sm-3">
+            <select id="batchSelect" class="form-control" disabled>
+              <option value="">Select Village</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <select id="fieldWorker" class="form-control" disabled>
+              <option value="">Select Field Worker</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <button id="submitSelection" type="button" class="form-control" disabled>Submit</button>
           </div>
         </div>
       </div>
@@ -67,6 +80,6 @@
         </div>
       </div>
     </div>
-    <footer style="justify-content: flex-end;">Version 0.1.0</footer>
+    <footer style="justify-content: flex-end">Version 0.1.0</footer>
   </body>
 </html>
