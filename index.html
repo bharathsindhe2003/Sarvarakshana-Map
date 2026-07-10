@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <link rel="stylesheet" href="index.css" />
+    <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-database.js"></script>
+    <script src="index.js" type="module"></script>
+    <script>
+      ((g) => {
+        var h,
+          a,
+          k,
+          p = "The Google Maps JavaScript API",
+          c = "google",
+          l = "importLibrary",
+          q = "__ib__",
+          m = document,
+          b = window;
+        b = b[c] || (b[c] = {});
+        var d = b.maps || (b.maps = {}),
+          r = new Set(),
+          e = new URLSearchParams(),
+          u = () =>
+            h ||
+            (h = new Promise(async (f, n) => {
+              await (a = m.createElement("script"));
+              e.set("libraries", [...r] + "");
+              for (k in g)
+                e.set(
+                  k.replace(/[A-Z]/g, (t) => "_" + t[0].toLowerCase()),
+                  g[k],
+                );
+              e.set("callback", c + ".maps." + q);
+              a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
+              d[q] = f;
+              a.onerror = () => (h = n(Error(p + " could not load.")));
+              a.nonce = m.querySelector("script[nonce]")?.nonce || "";
+              m.head.append(a);
+            }));
+        d[l] ? console.warn(p + " only loads once. Ignoring:", g) : (d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)));
+      })({ key: "AIzaSyAdRG1GxrdRTXK39zysIT57solJYXuqDm8", v: "weekly" });
+    </script>
+  </head>
+  <body>
+    <div>
+      <label for="fieldWorker" class="col-sm-2 mb-1 col-form-label">Field Worker</label>
+      <div class="col-sm-10">
+        <div class="row">
+          <div class="col-sm-6">
+            <select id="fieldWorker" class="form-control">
+              <option value=""></option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6" id="surveysectionMap">
+      <div class="card h-100">
+        <div class="row" style="margin-top: 20px">
+          <h6 class="section-title" style="align-content: center">Location Summary</h6>
+          <div id="map" style="height: 600px; padding: 20px"></div>
+          <div id="nodata" style="text-align: center; margin: auto; padding: 10px" hidden="true"></div>
+        </div>
+      </div>
+    </div>
+    <footer style="justify-content: flex-end;">Version 0.1.0</footer>
+  </body>
+</html>
